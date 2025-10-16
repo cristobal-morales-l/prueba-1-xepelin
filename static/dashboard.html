@@ -31,6 +31,23 @@
   <script>
     let data = [];
 
+    // ==============================
+    // Reintento automático del fetch
+    // ==============================
+    async function postWithRetry(url, options, retries = 3) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch(url, options);
+          if (!res.ok) throw new Error(await res.text());
+          return res;
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          console.warn(`⏳ Reintentando conexión... intento ${i + 1}`);
+          await new Promise(r => setTimeout(r, 2000)); // espera 2s entre intentos
+        }
+      }
+    }
+
     // -------------------------------
     // Autenticación
     // -------------------------------
@@ -50,9 +67,10 @@
     // -------------------------------
     async function cargarDatos() {
       const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS1C_LR5_KDL3EY4uWGC7eycpneFZ2Afld4WVctIx443v3W79S-A19_NROWkFAiW4b0S8L57zf-O426/pub?gid=0&single=true&output=csv";
+      const noCacheUrl = `${csvUrl}&t=${Date.now()}`; // evita caché
       
       try {
-        const res = await fetch(csvUrl);
+        const res = await fetch(noCacheUrl, { cache: "no-store" });
         const text = await res.text();
         const rows = text.split("\n").slice(1);
         data = rows
@@ -139,7 +157,7 @@
       btn.textContent = "Enviando…";
 
       try {
-        const res = await fetch("/api/guardar", {
+        const res = await postWithRetry("/api/guardar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
@@ -160,6 +178,7 @@
 
         d.tasa = nuevaTasa;
         input.classList.remove("changed");
+        renderTable(); // refresca tabla local
         alert(`✅ ${result.msg || "Tasa actualizada correctamente."}`);
 
       } catch (err) {
