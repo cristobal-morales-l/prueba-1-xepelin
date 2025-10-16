@@ -8,7 +8,7 @@ from google.oauth2.service_account import Credentials
 # === Configuración global ===
 GSHEET_ID = os.getenv("GSHEET_ID")
 CREDENTIALS_PATH = os.getenv("CREDENTIALS_PATH", "service_account.json")
-SHEET_NAME = os.getenv("SHEET_NAME", "Hoja 1")  
+SHEET_NAME = os.getenv("SHEET_NAME", "Sheet1")  
 
 
 # Si Railway pasa las credenciales como JSON embebido en variable de entorno
