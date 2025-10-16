@@ -43,7 +43,7 @@
         } catch (err) {
           if (i === retries - 1) throw err;
           console.warn(`⏳ Reintentando conexión... intento ${i + 1}`);
-          await new Promise(r => setTimeout(r, 2000)); // espera 2s entre intentos
+          await new Promise(r => setTimeout(r, 2000));
         }
       }
     }
@@ -63,29 +63,28 @@
     }
 
     // -------------------------------
-    // Cargar datos desde el Sheet (CSV)
+    // Cargar datos desde el backend (no CSV)
     // -------------------------------
     async function cargarDatos() {
-      const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS1C_LR5_KDL3EY4uWGC7eycpneFZ2Afld4WVctIx443v3W79S-A19_NROWkFAiW4b0S8L57zf-O426/pub?gid=0&single=true&output=csv";
-      const noCacheUrl = `${csvUrl}&t=${Date.now()}`; // evita caché
-      
       try {
-        const res = await fetch(noCacheUrl, { cache: "no-store" });
-        const text = await res.text();
-        const rows = text.split("\n").slice(1);
-        data = rows
-          .map(r => r.split(","))
-          .filter(r => r.length >= 3 && r[0])
-          .map(r => ({
-            idOp: parseInt(r[0].trim()),
-            tasa: parseFloat(r[1]),
-            email: r[2].trim()
-          }));
+        const res = await fetch("/api/data", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" }
+        });
+
+        const json = await res.json();
+        if (!Array.isArray(json)) throw new Error("Formato inesperado");
+
+        data = json.map(r => ({
+          idOp: parseInt(r.idOp),
+          tasa: parseFloat(r.tasa),
+          email: r.email
+        }));
 
         renderTable();
-        data.forEach(d => markChanged(d.idOp));
+        console.log("✅ Datos actualizados desde el backend:", data);
       } catch (err) {
-        alert("⚠️ Error cargando datos del Google Sheet: " + err.message);
+        alert("⚠️ Error cargando datos: " + err.message);
       }
     }
 
@@ -176,10 +175,8 @@
           throw new Error(result.error || result.msg || "Error en la respuesta del servidor");
         }
 
-        d.tasa = nuevaTasa;
-        input.classList.remove("changed");
-        renderTable(); // refresca tabla local
         alert(`✅ ${result.msg || "Tasa actualizada correctamente."}`);
+        await cargarDatos(); // recarga desde el backend real
 
       } catch (err) {
         console.error("❌ Error durante el guardado:", err);
