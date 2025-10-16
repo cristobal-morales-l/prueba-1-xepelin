@@ -5,6 +5,8 @@ import logging
 from flask import Flask, request, jsonify, send_from_directory
 from sheets_service import update_tasa
 from zapier_service import notificar_zapier
+from flask_cors import CORS
+
 
 # === Configurar logs globales ===
 sys.stdout.reconfigure(line_buffering=True)
@@ -28,6 +30,8 @@ logger.info(f"GOOGLE_SHEETS_CREDENTIALS presente: {'✅ Sí' if creds else '❌ 
 
 # === Crear app Flask ===
 app = Flask(__name__, static_folder="static")
+CORS(app)
+
 
 @app.route("/")
 def index():
