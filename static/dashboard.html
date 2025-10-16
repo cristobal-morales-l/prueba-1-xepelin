@@ -5,7 +5,7 @@
   <title>Dashboard | Prueba Growth Engineer</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    body { font-family: sans-serif; }
+    body { font-family: sans-serif; margin: 40px; }
     .muted { opacity: 0.6; cursor: not-allowed; }
     .changed { outline: 2px solid #0aa; }
     table { width: 70%; border-collapse: collapse; margin-top: 12px; }
@@ -29,10 +29,6 @@
   <table id="tabla"></table>
 
   <script>
-    const ZAPIER_URL = "https://hooks.zapier.com/hooks/catch/13232884/oahrt5g/";
-    const PROXY = "https://corsproxy.io/?";
-    const GAS_URL = "https://script.google.com/macros/s/TU_URL_DEL_SCRIPT/exec"; // 👈 cambia por la tuya
-
     let data = [];
 
     // -------------------------------
@@ -123,7 +119,7 @@
     }
 
     // -------------------------------
-    // Guardar cambios (Zapier + Sheet)
+    // Guardar cambios (Backend Flask)
     // -------------------------------
     async function guardar(idOp) {
       const d = data.find(x => x.idOp === idOp);
@@ -143,30 +139,35 @@
       btn.textContent = "Enviando…";
 
       try {
-        // 1️⃣ Enviar correo
-        const proxyUrl = `${PROXY}${encodeURIComponent(ZAPIER_URL)}`;
-        await fetch(proxyUrl, {
+        const res = await fetch("/api/guardar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
         });
 
-        // 2️⃣ Actualizar tasa en Sheet
-        await fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
+        let result = {};
+        try {
+          result = await res.json();
+        } catch {
+          throw new Error("Respuesta del servidor no válida");
+        }
 
-        // 3️⃣ Actualizar estado local
+        console.log("🔄 Respuesta del servidor:", result);
+
+        if (!res.ok) {
+          throw new Error(result.error || result.msg || "Error en la respuesta del servidor");
+        }
+
         d.tasa = nuevaTasa;
         input.classList.remove("changed");
-        alert(`✅ Tasa actualizada y notificación enviada (ID ${idOp})`);
+        alert(`✅ ${result.msg || "Tasa actualizada correctamente."}`);
+
       } catch (err) {
-        alert("⚠️ Error de conexión: " + err.message);
+        console.error("❌ Error durante el guardado:", err);
+        alert("⚠️ Error: " + err.message);
       } finally {
         btn.textContent = "Guardar";
-        markChanged(idOp); // vuelve a validar si hay cambios
+        markChanged(idOp);
       }
     }
 
