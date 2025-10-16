@@ -21,15 +21,11 @@
   <h2>Dashboard de Tasas</h2>
   <button onclick="logout()">Cerrar sesión</button>
 
-  <h3>Google Sheet (visualización):</h3>
-  <iframe 
-    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vS1C_LR5_KDL3EY4uWGC7eycpneFZ2Afld4WVctIx443v3W79S-A19_NROWkFAiW4b0S8L57zf-O426/pubhtml"
-    width="100%" 
-    height="400">
-  </iframe>
+  <h3>Vista actual (Google Sheet privado con credenciales):</h3>
+  <table id="tablaView"></table>
 
   <h3>Editor de Tasas:</h3>
-  <table id="tabla"></table>
+  <table id="tablaEdit"></table>
 
   <script>
     let data = [];
@@ -66,7 +62,7 @@
     }
 
     // -------------------------------
-    // Cargar datos desde el backend (Google Sheets privado)
+    // Cargar datos desde backend (Sheet real con credenciales)
     // -------------------------------
     async function cargarDatos() {
       try {
@@ -85,7 +81,8 @@
           email: r.email
         }));
 
-        renderTable();
+        renderView();
+        renderEditor();
         console.log("✅ Datos cargados desde backend:", data);
       } catch (err) {
         console.error("❌ Error cargando datos:", err);
@@ -94,10 +91,30 @@
     }
 
     // -------------------------------
-    // Renderizar tabla
+    // Renderizar vista (solo lectura)
     // -------------------------------
-    function renderTable() {
-      const table = document.getElementById("tabla");
+    function renderView() {
+      const t = document.getElementById("tablaView");
+      if (!data.length) {
+        t.innerHTML = "<tr><td colspan='3'>Cargando...</td></tr>";
+        return;
+      }
+      t.innerHTML = `
+        <tr><th>ID</th><th>Tasa</th><th>Email</th></tr>
+        ${data.map(d => `
+          <tr>
+            <td>${d.idOp}</td>
+            <td>${d.tasa}</td>
+            <td>${d.email}</td>
+          </tr>`).join("")}
+      `;
+    }
+
+    // -------------------------------
+    // Renderizar tabla editable
+    // -------------------------------
+    function renderEditor() {
+      const table = document.getElementById("tablaEdit");
       if (!data.length) {
         table.innerHTML = "<tr><td colspan='4'>Cargando datos...</td></tr>";
         return;
