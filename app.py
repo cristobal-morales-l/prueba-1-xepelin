@@ -1,31 +1,55 @@
 # app.py
-import logging
+import sys
 import os
+import logging
 from flask import Flask, request, jsonify, send_from_directory
 from sheets_service import update_tasa
 from zapier_service import notificar_zapier
 
-# === Configuración del logger ===
+# === Forzar logs en tiempo real (Railway muestra stdout/stderr) ===
+sys.stdout.reconfigure(line_buffering=True)
+os.environ["PYTHONUNBUFFERED"] = "1"
+
 logging.basicConfig(
     level=logging.INFO,
-    format="[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
+    format="[%(asctime)s] %(levelname)s: %(message)s",
+    stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
 
+logger.info("🚀 Iniciando aplicación Flask en Railway...")
+
+# === Comprobación de variables de entorno ===
+gsheet_id = os.getenv("GSHEET_ID")
+creds = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+logger.info(f"GSHEET_ID detectado: {gsheet_id if gsheet_id else '❌ No definido'}")
+logger.info(f"GOOGLE_SHEETS_CREDENTIALS presente: {'✅ Sí' if creds else '❌ No'}")
+
+# === Inicialización de Flask ===
 app = Flask(__name__, static_folder="static")
 
+
+# -------------------------------
+# Rutas Frontend
+# -------------------------------
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
+
 
 @app.route("/dashboard")
 def dashboard():
     return send_from_directory("static", "dashboard.html")
 
+
 @app.route("/<path:path>")
 def static_files(path):
     return send_from_directory("static", path)
 
+
+# -------------------------------
+# API principal
+# -------------------------------
 @app.route("/api/guardar", methods=["POST"])
 def guardar_tasa():
     """
@@ -33,11 +57,11 @@ def guardar_tasa():
     y notifica vía Zapier.
     """
     try:
-        data = request.get_json()
-        logger.info(f"📩 Request recibido: {data}")
+        data = request.get_json(force=True, silent=True)
+        logger.info(f"📩 Request recibido en /api/guardar: {data}")
 
         if not data:
-            logger.warning("❌ Request vacío o sin JSON válido")
+            logger.error("❌ No se recibió JSON válido en el request")
             return jsonify({"error": "sin datos"}), 400
 
         idOp = data.get("idOp")
@@ -56,6 +80,7 @@ def guardar_tasa():
         sheet_ok = update_tasa(idOp, tasa)
         logger.info(f"📊 Resultado Google Sheet: {sheet_ok}")
 
+        # 3️⃣ Respuesta final
         if zapier_ok and sheet_ok:
             logger.info(f"✅ idOp {idOp} actualizado correctamente")
             return jsonify({"ok": True, "msg": "Tasa actualizada y correo enviado"}), 200
@@ -73,7 +98,10 @@ def guardar_tasa():
         return jsonify({"error": str(e)}), 500
 
 
+# -------------------------------
+# Lanzar servidor Flask
+# -------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    logger.info(f"🚀 Iniciando servidor Flask en puerto {port}")
+    logger.info(f"🚀 Servidor Flask iniciado en puerto {port}")
     app.run(host="0.0.0.0", port=port)
