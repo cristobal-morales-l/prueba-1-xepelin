@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Login | Prueba Growth Engineer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="login-container">
+    <h2>Acceso</h2>
+    <input id="user" type="text" placeholder="Usuario">
+    <input id="pass" type="password" placeholder="Contraseña">
+    <button onclick="login()">Entrar</button>
+  </div>
+
+  <script>
+    function login() {
+      const user = document.getElementById('user').value;
+      const pass = document.getElementById('pass').value;
+
+      if (user === 'admin' && pass === '123') {
+        localStorage.setItem('auth', 'ok');
+        window.location.href = 'dashboard.html';
+      } else {
+        alert('Credenciales incorrectas');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard | Prueba Growth Engineer</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: sans-serif; }
+    .muted { opacity: 0.6; cursor: not-allowed; }
+    .changed { outline: 2px solid #0aa; }
+    table { width: 70%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    h2, h3 { margin-top: 18px; }
+  </style>
+</head>
+<body>
+
+  <h2>Dashboard de Tasas</h2>
+  <button onclick="logout()">Cerrar sesión</button>
+
+  <h3>Google Sheet embebido:</h3>
+  <iframe 
+    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vS1C_LR5_KDL3EY4uWGC7eycpneFZ2Afld4WVctIx443v3W79S-A19_NROWkFAiW4b0S8L57zf-O426/pubhtml"
+    width="100%" 
+    height="400">
+  </iframe>
+
+  <h3>Editor de Tasas:</h3>
+  <table id="tabla"></table>
+
+  <script>
+    const ZAPIER_URL = "https://hooks.zapier.com/hooks/catch/13232884/oahrt5g/";
+    const PROXY = "https://corsproxy.io/?";
+    const GAS_URL = "https://script.google.com/macros/s/TU_URL_DEL_SCRIPT/exec"; // 👈 cambia por la tuya
+
+    let data = [];
+
+    // -------------------------------
+    // Autenticación
+    // -------------------------------
+    function logout() {
+      localStorage.removeItem('auth');
+      window.location.href = 'index.html';
+    }
+
+    function checkAuth() {
+      if (localStorage.getItem('auth') !== 'ok') {
+        window.location.href = 'index.html';
+      }
+    }
+
+    // -------------------------------
+    // Cargar datos desde el Sheet (CSV)
+    // -------------------------------
+    async function cargarDatos() {
+      const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS1C_LR5_KDL3EY4uWGC7eycpneFZ2Afld4WVctIx443v3W79S-A19_NROWkFAiW4b0S8L57zf-O426/pub?gid=0&single=true&output=csv";
+      
+      try {
+        const res = await fetch(csvUrl);
+        const text = await res.text();
+        const rows = text.split("\n").slice(1);
+        data = rows
+          .map(r => r.split(","))
+          .filter(r => r.length >= 3 && r[0])
+          .map(r => ({
+            idOp: parseInt(r[0].trim()),
+            tasa: parseFloat(r[1]),
+            email: r[2].trim()
+          }));
+
+        renderTable();
+        data.forEach(d => markChanged(d.idOp));
+      } catch (err) {
+        alert("⚠️ Error cargando datos del Google Sheet: " + err.message);
+      }
+    }
+
+    // -------------------------------
+    // Renderizar tabla
+    // -------------------------------
+    function renderTable() {
+      const table = document.getElementById("tabla");
+      if (!data.length) {
+        table.innerHTML = "<tr><td colspan='4'>Cargando datos...</td></tr>";
+        return;
+      }
+
+      table.innerHTML = `
+        <tr><th>ID</th><th>Tasa</th><th>Email</th><th>Acción</th></tr>
+        ${data.map(d => `
+          <tr id="row-${d.idOp}">
+            <td>${d.idOp}</td>
+            <td>
+              <input type="number" step="0.01" id="tasa-${d.idOp}" value="${d.tasa}" oninput="markChanged(${d.idOp})">
+            </td>
+            <td>${d.email}</td>
+            <td>
+              <button id="btn-${d.idOp}" class="muted" onclick="guardar(${d.idOp})" disabled>Guardar</button>
+            </td>
+          </tr>`).join("")}
+      `;
+    }
+
+    // -------------------------------
+    // Detectar cambios en tasa
+    // -------------------------------
+    function markChanged(idOp) {
+      const d = data.find(x => x.idOp === idOp);
+      if (!d) return;
+      const v = parseFloat(document.getElementById(`tasa-${idOp}`).value);
+      const btn = document.getElementById(`btn-${idOp}`);
+      const input = document.getElementById(`tasa-${idOp}`);
+
+      if (!isNaN(v) && v !== d.tasa) {
+        btn.disabled = false;
+        btn.classList.remove('muted');
+        input.classList.add('changed');
+      } else {
+        btn.disabled = true;
+        btn.classList.add('muted');
+        input.classList.remove('changed');
+      }
+    }
+
+    // -------------------------------
+    // Guardar cambios (Zapier + Sheet)
+    // -------------------------------
+    async function guardar(idOp) {
+      const d = data.find(x => x.idOp === idOp);
+      if (!d) return;
+
+      const input = document.getElementById(`tasa-${idOp}`);
+      const btn = document.getElementById(`btn-${idOp}`);
+      const nuevaTasa = parseFloat(input.value);
+
+      if (isNaN(nuevaTasa)) return alert("Ingresa una tasa válida.");
+      if (nuevaTasa === d.tasa) return alert("Sin cambios: no se envía notificación.");
+
+      const body = { idOp: d.idOp, tasa: nuevaTasa, email: d.email };
+
+      btn.disabled = true;
+      btn.classList.add("muted");
+      btn.textContent = "Enviando…";
+
+      try {
+        // 1️⃣ Enviar correo
+        const proxyUrl = `${PROXY}${encodeURIComponent(ZAPIER_URL)}`;
+        await fetch(proxyUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        // 2️⃣ Actualizar tasa en Sheet
+        await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        // 3️⃣ Actualizar estado local
+        d.tasa = nuevaTasa;
+        input.classList.remove("changed");
+        alert(`✅ Tasa actualizada y notificación enviada (ID ${idOp})`);
+      } catch (err) {
+        alert("⚠️ Error de conexión: " + err.message);
+      } finally {
+        btn.textContent = "Guardar";
+        markChanged(idOp); // vuelve a validar si hay cambios
+      }
+    }
+
+    // -------------------------------
+    // Inicializar
+    // -------------------------------
+    checkAuth();
+    cargarDatos();
+  </script>
+</body>
+</html>
