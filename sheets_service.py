@@ -50,20 +50,26 @@ def leer_tasas():
 
         data = []
         for r in registros:
+            # Soporte para distintas capitalizaciones
+            id_op = r.get("idOp") or r.get("IDOP") or r.get("IdOp") or 0
+            tasa = r.get("tasa") or r.get("Tasa") or r.get("TASA") or 0
+            email = r.get("email") or r.get("Email") or r.get("EMAIL") or ""
+
             try:
-                id_op = int(r.get("idOp", 0))
-                tasa = float(r.get("tasa", 0))
-                email = str(r.get("email", "")).strip()
+                id_op = int(id_op)
+                tasa = float(tasa)
+                email = str(email).strip()
                 data.append({"idOp": id_op, "tasa": tasa, "email": email})
             except Exception as conv_err:
-                print(f"⚠️ Error de formato en fila: {r} → {conv_err}")
-                continue
+                print(f"⚠️ Error procesando fila {r}: {conv_err}")
 
+        print(f"✅ Datos cargados correctamente: {len(data)} filas")
         return data
 
     except Exception as e:
         print(f"❌ Error al leer Google Sheet: {e}")
         return []
+
 
 
 # -------------------------------
