@@ -1,18 +1,25 @@
 # sheets_service.py
 import os
 import json
+import time
 import gspread
 from google.oauth2.service_account import Credentials
 
 # === Configuración global ===
 GSHEET_ID = os.getenv("GSHEET_ID")
 CREDENTIALS_PATH = os.getenv("CREDENTIALS_PATH", "service_account.json")
+SHEET_NAME = os.getenv("SHEET_NAME", "Hoja 1")  
 
-# Si Railway pasa las credenciales por variable de entorno (texto JSON)
+
+# Si Railway pasa las credenciales como JSON embebido en variable de entorno
 if os.getenv("GOOGLE_SHEETS_CREDENTIALS"):
-    creds_content = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
-    with open("service_account.json", "w") as f:
-        json.dump(json.loads(creds_content), f)
+    try:
+        creds_content = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+        with open("service_account.json", "w") as f:
+            json.dump(json.loads(creds_content), f)
+        print("✅ Archivo de credenciales generado correctamente.")
+    except Exception as e:
+        print(f"⚠️ Error al escribir credenciales: {e}")
 
 
 # -------------------------------
@@ -31,22 +38,27 @@ def get_client():
 # -------------------------------
 def leer_tasas():
     """
-    Devuelve todas las filas del Sheet como una lista de diccionarios:
+    Devuelve todas las filas del Sheet como lista de diccionarios:
     [{idOp: 100, tasa: 1.5, email: 'correo@...'}, ...]
     """
     try:
         client = get_client()
-        sheet = client.open_by_key(GSHEET_ID).Sheet1
+        sheet = client.open_by_key(GSHEET_ID).worksheet(SHEET_NAME)
         registros = sheet.get_all_records()
 
-        # Asegurar conversión de tipos
+        print(f"📄 Leyendo hoja '{SHEET_NAME}' ({len(registros)} filas obtenidas)")
+
         data = []
         for r in registros:
-            data.append({
-                "idOp": int(r.get("idOp", 0)),
-                "tasa": float(r.get("tasa", 0)),
-                "email": str(r.get("email", "")).strip()
-            })
+            try:
+                id_op = int(r.get("idOp", 0))
+                tasa = float(r.get("tasa", 0))
+                email = str(r.get("email", "")).strip()
+                data.append({"idOp": id_op, "tasa": tasa, "email": email})
+            except Exception as conv_err:
+                print(f"⚠️ Error de formato en fila: {r} → {conv_err}")
+                continue
+
         return data
 
     except Exception as e:
@@ -64,17 +76,24 @@ def update_tasa(idOp, nueva_tasa):
     """
     try:
         client = get_client()
-        sheet = client.open_by_key(GSHEET_ID).sheet1
+        sheet = client.open_by_key(GSHEET_ID).worksheet(SHEET_NAME)
         data = sheet.get_all_records()
 
-        for i, row in enumerate(data, start=2):  # fila 2 porque fila 1 = encabezados
-            if int(row["idOp"]) == int(idOp):
+        fila_actualizada = None
+        for i, row in enumerate(data, start=2):  # fila 2 = primera fila de datos
+            if str(row.get("idOp")).strip() == str(idOp):
                 sheet.update_cell(i, 2, nueva_tasa)  # Columna 2 = "tasa"
-                print(f"✅ Tasa actualizada para idOp {idOp}")
-                return True
+                fila_actualizada = i
+                print(f"✅ Tasa actualizada para idOp {idOp} (fila {i})")
+                break
 
-        print(f"⚠️ idOp {idOp} no encontrado en el Sheet.")
-        return False
+        if not fila_actualizada:
+            print(f"⚠️ idOp {idOp} no encontrado en el Sheet.")
+            return False
+
+        # 🕐 esperar a que se propague antes de siguiente lectura
+        time.sleep(1.5)
+        return True
 
     except Exception as e:
         print(f"❌ Error al actualizar Google Sheet: {e}")
