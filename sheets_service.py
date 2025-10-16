@@ -36,7 +36,7 @@ def leer_tasas():
     """
     try:
         client = get_client()
-        sheet = client.open_by_key(GSHEET_ID).sheet1
+        sheet = client.open_by_key(GSHEET_ID).Sheet1
         registros = sheet.get_all_records()
 
         # Asegurar conversión de tipos
