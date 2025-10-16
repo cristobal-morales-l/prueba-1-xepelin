@@ -7,9 +7,27 @@
   <style>
     body { font-family: sans-serif; margin: 40px; background: #f9fafb; color: #222; }
     h2, h3 { margin-top: 18px; }
-    table { width: 80%; border-collapse: collapse; margin-top: 12px; background: #fff; }
+
+    /* === Estilo general de tablas === */
+    table { border-collapse: collapse; margin-top: 12px; background: #fff; }
     th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
     th { background: #eee; }
+
+    /* === Tabla compacta solo para la vista de Sheets === */
+    .tablaView {
+      width: 60%;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      border-radius: 6px;
+      overflow-y: auto;
+      max-height: 300px;
+      display: block;
+    }
+    .tablaView th, .tablaView td {
+      padding: 6px 8px;
+    }
+
+    /* === Botones y estados === */
     .muted { opacity: 0.6; cursor: not-allowed; }
     .changed { outline: 2px solid #0aa; }
     button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; background: #0284c7; color: white; }
@@ -21,8 +39,8 @@
   <h2>Dashboard de Tasas</h2>
   <button onclick="logout()">Cerrar sesión</button>
 
-  <h3>Vista actual (Google Sheet privado con credenciales):</h3>
-  <table id="tablaView"></table>
+  <h3>Vista Sheets:</h3>
+  <table id="tablaView" class="tablaView"></table>
 
   <h3>Editor de Tasas:</h3>
   <table id="tablaEdit"></table>
@@ -189,8 +207,7 @@
         if (!res.ok) throw new Error(result.error || result.msg || "Error en el servidor");
 
         alert(`✅ ${result.msg || "Tasa actualizada correctamente."}`);
-
-        await cargarDatos(); // vuelve a leer desde el backend real (no cacheado)
+        await cargarDatos();
       } catch (err) {
         console.error("❌ Error al guardar:", err);
         alert("⚠️ Error: " + err.message);
@@ -205,8 +222,6 @@
     // -------------------------------
     checkAuth();
     cargarDatos();
-
-    // 🔁 Actualiza la tabla automáticamente cada 60 segundos
     setInterval(cargarDatos, 60000);
   </script>
 </body>
